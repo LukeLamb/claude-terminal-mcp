@@ -98,6 +98,17 @@ zip -j Terminal.mcpb manifest.json package.json server.js
 
 **Settings** → **Extensions** → **All extensions** → **Terminal** → **Remove**.
 
+## Privacy policy
+
+**No data leaves your machine.** This extension runs entirely locally:
+
+- **Data collection:** None. The extension does not phone home, emit telemetry, or make any network requests of its own. All network calls you observe will be ones *you* ask Claude to run (e.g. `curl`, `wget`, `git push`).
+- **Data usage & storage:** Command transcripts (stdin excluded, stdout + stderr + exit code) are written to `/tmp/claude-term-mcp/runs/<timestamp>.log` so Claude can reference them later in the same conversation. Background job state (command, pid, stdout/stderr log files, exit code, status) is written to `/tmp/claude-term-mcp/jobs/<job-id>/`.
+- **Third-party sharing:** None. Nothing is ever transmitted to Anthropic, to the extension author, or to any third party by this extension. (Claude Desktop itself separately sends tool inputs/outputs to Anthropic as part of the normal chat flow — that's Anthropic's relationship with you, not this extension's.)
+- **Retention:** `/tmp/claude-term-mcp/` is cleared at every reboot. To clear it manually: `rm -rf /tmp/claude-term-mcp`.
+- **Permissions scope:** Commands run with your own user's permissions — the same as if you typed them into a terminal.
+- **Contact / questions:** Open an issue at <https://github.com/LukeLamb/claude-terminal-mcp/issues>.
+
 ## License
 
 [MIT](LICENSE). Use freely, attribution appreciated, no warranty.

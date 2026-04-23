@@ -385,6 +385,7 @@ const TOOLS = [
   {
     name: 'run_command',
     description: "Run a shell command via bash -lc on the user's machine. Returns stdout/stderr/exit_code. Default cwd is the user-configured default working directory (or $HOME if unset). Output capped at 100KB per stream; full transcript saved to log_path.",
+    annotations: { title: 'Run shell command', destructiveHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -399,6 +400,7 @@ const TOOLS = [
   {
     name: 'read_file',
     description: 'Read a text file with optional line-range slicing.',
+    annotations: { title: 'Read file', readOnlyHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -412,11 +414,13 @@ const TOOLS = [
   {
     name: 'list_directory',
     description: 'List entries in a directory with type, size, and mtime.',
+    annotations: { title: 'List directory', readOnlyHint: true },
     inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
   },
   {
     name: 'write_file',
     description: 'Create or overwrite a text file. Parent directories are created.',
+    annotations: { title: 'Write file', destructiveHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -430,6 +434,7 @@ const TOOLS = [
   {
     name: 'run_background',
     description: 'Start a long-running command in the background. Returns a job_id you can poll with read_background.',
+    annotations: { title: 'Run command in background', destructiveHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: { command: { type: 'string' }, cwd: { type: 'string' } },
@@ -439,6 +444,7 @@ const TOOLS = [
   {
     name: 'read_background',
     description: 'Read status and last N lines of stdout/stderr for a background job. tail=0 returns full logs.',
+    annotations: { title: 'Read background job output', readOnlyHint: true },
     inputSchema: {
       type: 'object',
       properties: {
@@ -451,11 +457,13 @@ const TOOLS = [
   {
     name: 'list_background',
     description: 'List all background jobs (running, exited, killed).',
+    annotations: { title: 'List background jobs', readOnlyHint: true },
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'kill_background',
     description: 'Terminate a running background job (SIGTERM, then SIGKILL after 5s).',
+    annotations: { title: 'Kill background job', destructiveHint: true },
     inputSchema: { type: 'object', properties: { job_id: { type: 'string' } }, required: ['job_id'] },
   },
 ];
@@ -478,7 +486,7 @@ async function handle(msg) {
     respond(id, {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'terminal-mcp', version: '0.2.0' },
+      serverInfo: { name: 'terminal-mcp', version: '0.3.0' },
     });
     return;
   }

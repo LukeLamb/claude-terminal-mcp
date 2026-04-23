@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "Terminal",
   "display_name": "Terminal",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Give Claude terminal, filesystem, and background-job access on your local Linux machine.",
   "long_description": "This extension lets Claude run shell commands, read and write files, and launch long-running background jobs on your local Linux machine. Commands run via `bash -lc` so venv activation, pipes, and aliases work the same as in a real terminal. Output is capped at 100KB per stream with full transcripts persisted to /tmp/claude-term-mcp/runs/. Background jobs are detached and track their status in /tmp/claude-term-mcp/jobs/.\n\n**Security:** Installing this extension grants Claude unrestricted shell access, equivalent to giving someone SSH into your user account. A minimal built-in denylist blocks a handful of obviously-destructive patterns (`rm -rf /`, fork bombs, `dd` / `mkfs` on raw disk devices), but this is a last-resort safety net, not a sandbox. Do not install on machines where Claude should not have unrestricted shell access.",
   "author": {
@@ -16,6 +16,10 @@
   },
   "documentation": "https://github.com/LukeLamb/claude-terminal-mcp#readme",
   "support": "https://github.com/LukeLamb/claude-terminal-mcp/issues",
+  "icon": "icon.png",
+  "privacy_policies": [
+    "https://github.com/LukeLamb/claude-terminal-mcp#privacy-policy"
+  ],
   "server": {
     "type": "node",
     "entry_point": "server.js",
@@ -31,35 +35,69 @@
   "tools": [
     {
       "name": "run_command",
-      "description": "Run a shell command via bash -lc. Returns stdout, stderr, exit_code. Output capped at 100KB per stream; full transcript saved to log_path."
+      "description": "Run a shell command via bash -lc. Returns stdout, stderr, exit_code. Output capped at 100KB per stream; full transcript saved to log_path.",
+      "annotations": {
+        "title": "Run shell command",
+        "destructiveHint": true,
+        "openWorldHint": true
+      }
     },
     {
       "name": "read_file",
-      "description": "Read a text file with optional offset/limit line-range slicing."
+      "description": "Read a text file with optional offset/limit line-range slicing.",
+      "annotations": {
+        "title": "Read file",
+        "readOnlyHint": true
+      }
     },
     {
       "name": "list_directory",
-      "description": "List entries in a directory with type, size, and mtime."
+      "description": "List entries in a directory with type, size, and mtime.",
+      "annotations": {
+        "title": "List directory",
+        "readOnlyHint": true
+      }
     },
     {
       "name": "write_file",
-      "description": "Create or overwrite a text file. Parent directories are created."
+      "description": "Create or overwrite a text file. Parent directories are created.",
+      "annotations": {
+        "title": "Write file",
+        "destructiveHint": true
+      }
     },
     {
       "name": "run_background",
-      "description": "Start a long-running command in the background. Returns a job_id."
+      "description": "Start a long-running command in the background. Returns a job_id.",
+      "annotations": {
+        "title": "Run command in background",
+        "destructiveHint": true,
+        "openWorldHint": true
+      }
     },
     {
       "name": "read_background",
-      "description": "Read status and last N lines of stdout/stderr for a background job."
+      "description": "Read status and last N lines of stdout/stderr for a background job.",
+      "annotations": {
+        "title": "Read background job output",
+        "readOnlyHint": true
+      }
     },
     {
       "name": "list_background",
-      "description": "List all background jobs (running, exited, killed)."
+      "description": "List all background jobs (running, exited, killed).",
+      "annotations": {
+        "title": "List background jobs",
+        "readOnlyHint": true
+      }
     },
     {
       "name": "kill_background",
-      "description": "Terminate a running background job (SIGTERM, then SIGKILL after 5s)."
+      "description": "Terminate a running background job (SIGTERM, then SIGKILL after 5s).",
+      "annotations": {
+        "title": "Kill background job",
+        "destructiveHint": true
+      }
     }
   ],
   "keywords": [
