@@ -1,0 +1,11 @@
+# Build artifact — lives in GitHub Releases, not in the source tree
+Terminal.mcpb
+
+# OS / editor junk
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# If anyone adds npm deps in a fork
+node_modules/

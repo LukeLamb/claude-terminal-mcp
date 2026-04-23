@@ -1,0 +1,96 @@
+{
+  "manifest_version": "0.2",
+  "name": "Terminal",
+  "display_name": "Terminal",
+  "version": "0.2.0",
+  "description": "Give Claude terminal, filesystem, and background-job access on your local Linux machine.",
+  "long_description": "This extension lets Claude run shell commands, read and write files, and launch long-running background jobs on your local Linux machine. Commands run via `bash -lc` so venv activation, pipes, and aliases work the same as in a real terminal. Output is capped at 100KB per stream with full transcripts persisted to /tmp/claude-term-mcp/runs/. Background jobs are detached and track their status in /tmp/claude-term-mcp/jobs/.\n\n**Security:** Installing this extension grants Claude unrestricted shell access, equivalent to giving someone SSH into your user account. A minimal built-in denylist blocks a handful of obviously-destructive patterns (`rm -rf /`, fork bombs, `dd` / `mkfs` on raw disk devices), but this is a last-resort safety net, not a sandbox. Do not install on machines where Claude should not have unrestricted shell access.",
+  "author": {
+    "name": "Luke Lamb",
+    "url": "https://github.com/LukeLamb"
+  },
+  "homepage": "https://github.com/LukeLamb/claude-terminal-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LukeLamb/claude-terminal-mcp"
+  },
+  "documentation": "https://github.com/LukeLamb/claude-terminal-mcp#readme",
+  "support": "https://github.com/LukeLamb/claude-terminal-mcp/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server.js",
+        "--default-cwd",
+        "${user_config.default_cwd}"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "run_command",
+      "description": "Run a shell command via bash -lc. Returns stdout, stderr, exit_code. Output capped at 100KB per stream; full transcript saved to log_path."
+    },
+    {
+      "name": "read_file",
+      "description": "Read a text file with optional offset/limit line-range slicing."
+    },
+    {
+      "name": "list_directory",
+      "description": "List entries in a directory with type, size, and mtime."
+    },
+    {
+      "name": "write_file",
+      "description": "Create or overwrite a text file. Parent directories are created."
+    },
+    {
+      "name": "run_background",
+      "description": "Start a long-running command in the background. Returns a job_id."
+    },
+    {
+      "name": "read_background",
+      "description": "Read status and last N lines of stdout/stderr for a background job."
+    },
+    {
+      "name": "list_background",
+      "description": "List all background jobs (running, exited, killed)."
+    },
+    {
+      "name": "kill_background",
+      "description": "Terminate a running background job (SIGTERM, then SIGKILL after 5s)."
+    }
+  ],
+  "keywords": [
+    "terminal",
+    "shell",
+    "bash",
+    "filesystem",
+    "linux",
+    "automation",
+    "productivity",
+    "developer"
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": [
+      "linux",
+      "darwin"
+    ],
+    "runtimes": {
+      "node": ">=16.0.0"
+    }
+  },
+  "user_config": {
+    "default_cwd": {
+      "type": "directory",
+      "title": "Default working directory",
+      "description": "Folder where shell commands run when Claude doesn't specify a working directory. Typically your main projects folder. Leave empty to default to your home directory.",
+      "required": false,
+      "multiple": false,
+      "default": ""
+    }
+  }
+}

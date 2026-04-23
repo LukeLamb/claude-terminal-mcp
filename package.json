@@ -1,0 +1,8 @@
+{
+  "name": "luke-terminal",
+  "version": "0.1.0",
+  "description": "MCP server giving Claude terminal, filesystem, and background-job access on Ubuntu.",
+  "main": "server.js",
+  "license": "MIT",
+  "dependencies": {}
+}
