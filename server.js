@@ -486,7 +486,7 @@ async function handle(msg) {
     respond(id, {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'terminal-mcp', version: '0.3.0' },
+      serverInfo: { name: 'terminal-mcp', version: '0.3.1' },
     });
     return;
   }
