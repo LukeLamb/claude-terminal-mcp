@@ -25,13 +25,18 @@ function parseArgv() {
 }
 
 const ARGS = parseArgv();
+// Claude Desktop substitutes ${user_config.<name>} only when the user has
+// supplied a value; if the field is blank the literal placeholder string is
+// passed through unchanged. Detect that case and fall back to $HOME.
 const DEFAULT_CWD = (() => {
-  const candidate = ARGS.defaultCwd && ARGS.defaultCwd.trim();
-  if (candidate) {
-    if (candidate === '~') return os.homedir();
-    if (candidate.startsWith('~/')) return path.join(os.homedir(), candidate.slice(2));
-    return candidate;
-  }
+  const raw = ARGS.defaultCwd && ARGS.defaultCwd.trim();
+  if (!raw || raw.startsWith('${user_config')) return os.homedir();
+  let candidate = raw;
+  if (candidate === '~') candidate = os.homedir();
+  else if (candidate.startsWith('~/')) candidate = path.join(os.homedir(), candidate.slice(2));
+  try {
+    if (fs.statSync(candidate).isDirectory()) return candidate;
+  } catch (_) {}
   return os.homedir();
 })();
 const RUNS_ROOT = '/tmp/claude-term-mcp/runs';
@@ -119,15 +124,28 @@ function runCommand(args) {
       return;
     }
 
+    try {
+      if (!fs.statSync(workdir).isDirectory()) throw new Error('not a directory');
+    } catch (_) {
+      resolve(errorResult(`cwd does not exist or is not a directory: ${workdir}`));
+      return;
+    }
+
     let stdoutBuf = Buffer.alloc(0);
     let stderrBuf = Buffer.alloc(0);
     let timedOut = false;
 
-    const child = spawn('bash', ['-lc', command], {
-      cwd: workdir,
-      env: { ...process.env, ...Object.fromEntries(Object.entries(extraEnv).map(([k, v]) => [k, String(v)])) },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    let child;
+    try {
+      child = spawn('bash', ['-lc', command], {
+        cwd: workdir,
+        env: { ...process.env, ...Object.fromEntries(Object.entries(extraEnv).map(([k, v]) => [k, String(v)])) },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (e) {
+      resolve(errorResult(`spawn failed synchronously: ${e.message}`));
+      return;
+    }
 
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeoutMs);
 
@@ -264,7 +282,12 @@ function runBackground(args) {
       `If you believe this is a false positive, ask the user to edit server.js and remove the matching DENYLIST entry.`
     );
   }
-  const workdir = resolveCwd(args.cwd);
+  let workdir = resolveCwd(args.cwd);
+  try {
+    if (!fs.statSync(workdir).isDirectory()) throw new Error('not a directory');
+  } catch (_) {
+    return errorResult(`cwd does not exist or is not a directory: ${workdir}`);
+  }
   fs.mkdirSync(JOBS_ROOT, { recursive: true });
   const id = randomUUID().replace(/-/g, '').slice(0, 12);
   const d = jobDir(id);
@@ -285,17 +308,38 @@ function runBackground(args) {
     `printf "%s" "$(date +%s.%N)" > ${JSON.stringify(path.join(d, 'ended_at'))}; ` +
     `printf "%s" exited > ${JSON.stringify(path.join(d, 'status'))}`;
 
-  const child = spawn('bash', ['-lc', wrapper], {
-    cwd: workdir,
-    stdio: ['ignore', stdoutFd, stderrFd],
-    detached: true,
+  let child;
+  try {
+    child = spawn('bash', ['-lc', wrapper], {
+      cwd: workdir,
+      stdio: ['ignore', stdoutFd, stderrFd],
+      detached: true,
+    });
+  } catch (e) {
+    try { fs.closeSync(stdoutFd); } catch (_) {}
+    try { fs.closeSync(stderrFd); } catch (_) {}
+    fs.writeFileSync(path.join(d, 'status'), 'failed');
+    return errorResult(`background spawn failed synchronously: ${e.message}`);
+  }
+  // Attach error handler BEFORE unref/pid access — an unhandled 'error' on
+  // a detached ChildProcess crashes the whole MCP server. This was the
+  // v0.3.1 regression: spawn with an invalid cwd emits 'error' async and
+  // took the server down.
+  child.on('error', (e) => {
+    try { fs.writeFileSync(path.join(d, 'status'), 'failed'); } catch (_) {}
+    try { fs.writeFileSync(path.join(d, 'stderr.log'), `background spawn error: ${e.message}\n`); } catch (_) {}
+    log('background spawn error:', e.message);
   });
   child.unref();
-  fs.writeFileSync(path.join(d, 'pid'), String(child.pid));
-  fs.closeSync(stdoutFd);
-  fs.closeSync(stderrFd);
+  fs.writeFileSync(path.join(d, 'pid'), String(child.pid ?? 'unknown'));
+  try { fs.closeSync(stdoutFd); } catch (_) {}
+  try { fs.closeSync(stderrFd); } catch (_) {}
 
-  return textResult({ job_id: id, cwd: workdir, command, status: 'running' });
+  if (child.pid === undefined) {
+    fs.writeFileSync(path.join(d, 'status'), 'failed');
+    return errorResult('background spawn returned no pid (process could not be started). Check cwd and PATH.');
+  }
+  return textResult({ job_id: id, pid: child.pid, cwd: workdir, command, status: 'running' });
 }
 
 function tailText(p, tail) {
@@ -486,7 +530,7 @@ async function handle(msg) {
     respond(id, {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'terminal-mcp', version: '0.3.1' },
+      serverInfo: { name: 'terminal-mcp', version: '0.3.2' },
     });
     return;
   }
