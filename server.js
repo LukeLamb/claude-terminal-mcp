@@ -263,9 +263,18 @@ function refreshJobStatus(id) {
   const status = fs.readFileSync(statusFile, 'utf8').trim();
   if (status !== 'running') return;
   const pidFile = path.join(d, 'pid');
-  if (!fs.existsSync(pidFile)) return;
-  const pid = parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10);
-  if (Number.isNaN(pid) || pidAlive(pid)) return;
+  const pidRaw = fs.existsSync(pidFile) ? fs.readFileSync(pidFile, 'utf8').trim() : '';
+  const pid = parseInt(pidRaw, 10);
+  // A missing/NaN/"undefined" pid means the spawn failed or the MCP crashed
+  // before recording a valid pid (v0.3.1 bug). Reconcile as orphaned so the
+  // entry doesn't stick at "running" forever.
+  if (!pidRaw || Number.isNaN(pid)) {
+    fs.writeFileSync(statusFile, 'orphaned');
+    if (!fs.existsSync(path.join(d, 'ended_at'))) fs.writeFileSync(path.join(d, 'ended_at'), String(Date.now() / 1000));
+    if (!fs.existsSync(path.join(d, 'exit_code'))) fs.writeFileSync(path.join(d, 'exit_code'), '-1');
+    return;
+  }
+  if (pidAlive(pid)) return;
   fs.writeFileSync(statusFile, 'exited');
   const endedFile = path.join(d, 'ended_at');
   if (!fs.existsSync(endedFile)) fs.writeFileSync(endedFile, String(Date.now() / 1000));
@@ -301,12 +310,17 @@ function runBackground(args) {
   const stdoutFd = fs.openSync(path.join(d, 'stdout.log'), 'w');
   const stderrFd = fs.openSync(path.join(d, 'stderr.log'), 'w');
 
-  const wrapper =
-    `bash -lc ${JSON.stringify(command)}; ` +
-    `ec=$?; ` +
-    `printf "%s" "$ec" > ${JSON.stringify(path.join(d, 'exit_code'))}; ` +
-    `printf "%s" "$(date +%s.%N)" > ${JSON.stringify(path.join(d, 'ended_at'))}; ` +
-    `printf "%s" exited > ${JSON.stringify(path.join(d, 'status'))}`;
+  // Run the user command directly inside the bookkeeping shell — do NOT
+  // wrap it in an inner `bash -lc "<cmd>"`, because the OUTER bash would
+  // eat any $(...) or $VAR expansions inside the quoted command string
+  // before the inner bash ever sees them (v0.3.2 regression).
+  const wrapper = [
+    command,
+    `ec=$?`,
+    `printf "%s" "$ec" > ${JSON.stringify(path.join(d, 'exit_code'))}`,
+    `printf "%s" "$(date +%s.%N)" > ${JSON.stringify(path.join(d, 'ended_at'))}`,
+    `printf "%s" exited > ${JSON.stringify(path.join(d, 'status'))}`,
+  ].join('\n');
 
   let child;
   try {
@@ -386,10 +400,12 @@ function listBackground() {
       return fs.existsSync(p) ? fs.readFileSync(p, 'utf8').trim() : def;
     };
     const exitRaw = readT('exit_code');
+    const pidRaw = readT('pid');
+    const pidNum = parseInt(pidRaw, 10);
     return {
       job_id: id,
       status: readT('status') || 'unknown',
-      pid: parseInt(readT('pid') || '0', 10),
+      pid: Number.isFinite(pidNum) ? pidNum : null,
       command: fs.existsSync(path.join(d, 'cmd.txt')) ? fs.readFileSync(path.join(d, 'cmd.txt'), 'utf8') : '',
       started_at: parseFloat(readT('started_at') || '0') || null,
       ended_at: parseFloat(readT('ended_at') || '0') || null,
@@ -530,7 +546,7 @@ async function handle(msg) {
     respond(id, {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'terminal-mcp', version: '0.3.2' },
+      serverInfo: { name: 'terminal-mcp', version: '0.3.3' },
     });
     return;
   }
