@@ -539,14 +539,19 @@ const HANDLERS = {
   kill_background: killBackground,
 };
 
+// Newest first. Echo the client's requested version when we support it,
+// otherwise offer our latest and let the client decide.
+const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
+
 async function handle(msg) {
   const { id, method, params } = msg;
 
   if (method === 'initialize') {
+    const requested = params && params.protocolVersion;
     respond(id, {
-      protocolVersion: '2024-11-05',
+      protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : SUPPORTED_PROTOCOL_VERSIONS[0],
       capabilities: { tools: {} },
-      serverInfo: { name: 'terminal-mcp', version: '0.3.3' },
+      serverInfo: { name: 'terminal-mcp', version: '0.3.4' },
     });
     return;
   }
